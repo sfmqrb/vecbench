@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 import faiss
 import os
-from helper import BASE_DIR
 
 
-class HNSW_faiss():
-    def __init__(self, dim, ef_construction, m, path):
+class HNSW_faiss:
+    def __init__(self, dim, ef_construction, m, index_path):
         self.dim = dim
-        self.metric = metric
+        self.metric = faiss.METRIC_L2
         self.ef_construction = ef_construction
         self.m = m
-        self.name = path + f"hnsw_M{m}_ef{ef_construction}.faiss"
+        self.name = index_path
         self.index = faiss.IndexHNSWFlat(dim, m)
         self.index.hnsw.efConstruction = ef_construction
 
@@ -29,3 +28,4 @@ class HNSW_faiss():
 
     def load(self, path):
         self.index = faiss.read_index(path)
+        return self.index
