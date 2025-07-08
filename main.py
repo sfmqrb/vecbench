@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import os
-import faiss
 import argparse
 import time
+
+from helper import read_fvecs, read_ground_truth, recall_at_k, BASE_DIR
+from hnsw_faiss import HNSW_faiss
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -27,10 +29,10 @@ if __name__ == "__main__":
     ef_const = 500
     K = 10
 
-    base_path = f"/nvmepool/smaghrebi/glove/glove_{size}_300d_test.fvecs"
-    query_path = "/nvmepool/smaghrebi/glove/query.fvecs"
-    gt_path = f"/nvmepool/smaghrebi/glove/glove_gt_{size}_50K.bin"
-    idx_dir = "/nvmepool/smaghrebi/glove"
+    base_path = os.path.join(BASE_DIR, f"glove/glove_{size}_300d_test.fvecs")
+    query_path = os.path.join(BASE_DIR, "glove/query.fvecs")
+    gt_path = os.path.join(BASE_DIR, f"glove/glove_gt_{size}_50K.bin")
+    idx_dir = os.path.join(BASE_DIR, "glove")
     idx_name = f"hnsw_M{M}_ef{ef_const}_{size}.faiss"
     idx_path = os.path.join(idx_dir, idx_name)
 
@@ -41,24 +43,19 @@ if __name__ == "__main__":
     print("Loading query vectors…")
     xq = read_fvecs(query_path)
 
-    # Build or load index
-    if os.path.exists(idx_path):
-        print(f"Loading existing index from {idx_path}")
-        index = faiss.read_index(idx_path)
-    else:
-        print("Building new HNSW index…")
-        d = xb.shape[1]
-        index = faiss.IndexHNSWFlat(d, M)
-        index.hnsw.efConstruction = ef_const
-        index.add(xb)
-        print(f"Saving index to {idx_path}")
-        faiss.write_index(index, idx_path)
+    # Build or load index using the helper class
+    d = xb.shape[1]
+    hnsw = HNSW_faiss(d, ef_const, M, idx_path)
+    hnsw.build(xb)
+    if not os.path.exists(idx_path):
+        hnsw.save(idx_path)
+    index = hnsw.index
 
     # Search and time it
     index.hnsw.efSearch = ef_search
     print(f"Searching top-{K} for {xq.shape[0]} queries…")
     start_time = time.time()
-    D, I = index.search(xq, K)
+    D, I = hnsw.search(xq, K)
     query_time = time.time() - start_time
     print(f"Query time: {query_time:.4f} seconds")
 
